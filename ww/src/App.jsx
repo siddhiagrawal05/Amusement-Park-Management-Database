@@ -24,6 +24,13 @@ import Reports from './admin/Reports';
 import Support from './admin/Support';
 import PlazaAdmin from './admin/PlazaAdmin';
 import ShowsAdmin from './admin/ShowsAdmin';
+import SqlLab from './admin/SqlLab';
+import FoodOrders from './admin/FoodOrders';
+import Offers from './admin/Offers';
+import Capacity from './admin/Capacity';
+import Shifts from './admin/Shifts';
+import Reviews from './admin/Reviews';
+import LostFound from './admin/LostFound';
 
 function Site() {
   return (
@@ -63,6 +70,13 @@ export default function App() {
         <Route path="help" element={<Support />} />
         <Route path="plaza" element={<PlazaAdmin />} />
         <Route path="shows" element={<ShowsAdmin />} />
+        <Route path="lab" element={<SqlLab />} />
+        <Route path="orders" element={<FoodOrders />} />
+        <Route path="offers" element={<Offers />} />
+        <Route path="capacity" element={<Capacity />} />
+        <Route path="shifts" element={<Shifts />} />
+        <Route path="reviews" element={<Reviews />} />
+        <Route path="lost" element={<LostFound />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" />} />
