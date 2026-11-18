@@ -7,6 +7,7 @@ import Home from './pages/Home';
 import Rides from './pages/Rides';
 import ParkMap from './pages/ParkMap';
 import Plaza from './pages/Plaza';
+import Shows from './pages/Shows';
 import Tickets from './pages/Tickets';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -21,6 +22,8 @@ import Staff from './admin/Staff';
 import Usage from './admin/Usage';
 import Reports from './admin/Reports';
 import Support from './admin/Support';
+import PlazaAdmin from './admin/PlazaAdmin';
+import ShowsAdmin from './admin/ShowsAdmin';
 
 function Site() {
   return (
@@ -36,12 +39,12 @@ function Site() {
 export default function App() {
   return (
     <Routes>
-      {/* Public + Visitor pages */}
       <Route element={<Site />}>
         <Route path="/" element={<Home />} />
         <Route path="/rides" element={<Rides />} />
         <Route path="/map" element={<ParkMap />} />
         <Route path="/plaza" element={<Plaza />} />
+        <Route path="/shows" element={<Shows />} />
         <Route path="/tickets" element={<Tickets />} />
         <Route path="/help" element={<Help />} />
         <Route path="/login" element={<Login key="v" role="visitor" />} />
@@ -50,8 +53,6 @@ export default function App() {
         <Route path="/my-bookings" element={<Guard role="visitor"><MyBookings /></Guard>} />
         <Route path="/ticket/:id" element={<Guard role="visitor"><Ticket /></Guard>} />
       </Route>
-
-      {/* Admin pages (only admin can open) */}
       <Route path="/admin" element={<Guard role="admin"><Layout /></Guard>}>
         <Route index element={<Dash />} />
         <Route path="rides" element={<ARides />} />
@@ -60,6 +61,8 @@ export default function App() {
         <Route path="usage" element={<Usage />} />
         <Route path="reports" element={<Reports />} />
         <Route path="help" element={<Support />} />
+        <Route path="plaza" element={<PlazaAdmin />} />
+        <Route path="shows" element={<ShowsAdmin />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" />} />

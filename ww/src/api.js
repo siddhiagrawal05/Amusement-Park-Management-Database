@@ -1,6 +1,3 @@
-// WonderWorld API client.
-// All data now lives in MySQL. This file talks to the Node + Express server.
-
 const BASE = 'http://localhost:5050/api';
 const SKEY = 'ww_session';
 
@@ -12,8 +9,6 @@ export const addDays = (s, n) => {
   return fmt(d);
 };
 export const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
-
-// ---------- Page photos (free Unsplash images) ----------
 const u = (id, w = 1200) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=${w}&q=80`;
 
 export const PICS = {
@@ -31,15 +26,11 @@ export const PICS = {
   bRides: u('1627035983655-0ceec61bb733', 1920),
   bTickets: u('1544441452-326ff5a947fd', 1920),
 };
-
-// ---------- QR code (third-party QR Server API, no key needed) ----------
 export const qrUrl = (b, size = 200) => {
   const guests = b.items.reduce((s, i) => s + i.qty, 0);
   const data = `WONDERWORLD|${b.bookingId}|${b.visitDate}|${guests}`;
   return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=8&data=${encodeURIComponent(data)}`;
 };
-
-// ---------- Login session (token + user) ----------
 export const getSession = () => JSON.parse(localStorage.getItem(SKEY) || 'null');
 const setSession = (s) => (s ? localStorage.setItem(SKEY, JSON.stringify(s)) : localStorage.removeItem(SKEY));
 
@@ -54,11 +45,12 @@ async function req(path, method = 'GET', body) {
   if (!res.ok) throw new Error(data.error || 'Server error. Please try again.');
   return data;
 }
-
-// ---------- Local copy of the data (refreshed after every change) ----------
 const empty = {
   users: [], ticketTypes: [], rides: [], schedules: [], maintenance: [],
   employees: [], bookings: [], rideLogs: [], supportRequests: [],
+  plazaShows: [], showTimes: [], restaurants: [], menuItems: [], shops: [],
+  reviews: [], passPlans: [], passes: [], foodOrders: [], parking: [], lostItems: [], foundItems: [],
+  settings: [], promoCodes: [], shifts: [],
 };
 let cache = { ...empty };
 
@@ -67,14 +59,12 @@ export async function loadData() {
     cache = { ...empty, ...(await req('/data')) };
   } catch (e) {
     if (!getSession()) throw e;
-    setSession(null); // expired login: log out and load public data
+    setSession(null);
     cache = { ...empty, ...(await req('/data')) };
   }
 }
 
 export const all = (table) => cache[table] || [];
-
-// ---------- Module 1: Register & Login ----------
 export async function register(form) {
   const s = await req('/auth/register', 'POST', form);
   setSession(s);
@@ -93,27 +83,20 @@ export async function logout() {
   setSession(null);
   await loadData();
 }
-
-// ---------- Module 2: Payment + Ticket Booking ----------
-// Step 1: ask the server to create a payment order
-export const createPaymentOrder = (visitDate, items) => req('/payments/order', 'POST', { visitDate, items });
-
-// Step 2: after payment, send the payment details so the server can verify and save the booking
-export async function createBooking(visitDate, items, payment) {
-  const b = await req('/bookings', 'POST', { visitDate, items, payment });
+export const getQuote = (visitDate, items, promoCode) => req('/price', 'POST', { visitDate, items, promoCode });
+export const getCapacity = (date) => req(`/capacity?date=${date}`);
+export const createPaymentOrder = (visitDate, items, promoCode) => req('/payments/order', 'POST', { visitDate, items, promoCode });
+export async function createBooking(visitDate, items, payment, promoCode) {
+  const b = await req('/bookings', 'POST', { visitDate, items, payment, promoCode });
   await loadData();
   return b;
 }
-
-// A booking can be cancelled only if it is confirmed and the visit date is in the future
 export const canCancel = (b) => b.status === 'Confirmed' && b.visitDate > today();
 
 export async function cancelBooking(id) {
   await req(`/bookings/${id}/cancel`, 'PUT');
   await loadData();
 }
-
-// ---------- Modules 3, 4, 5: Rides, schedules, maintenance, employees ----------
 export async function logRide(rideId) {
   await req(`/rides/${rideId}/ride`, 'POST');
   await loadData();
@@ -132,9 +115,59 @@ export async function remove(table, id) {
 }
 
 export const saveMaint = (m) => upsert('maintenance', m);
-
-// ---------- Help Center ----------
 export const createSupportRequest = (form) => req('/support', 'POST', form);
+export async function placeFoodOrder(restaurantId, items, note) {
+  const o = await req('/orders', 'POST', { restaurantId, items, note });
+  await loadData();
+  return o;
+}
 
-// ---------- Module 6: Revenue ----------
+export async function cancelFoodOrder(id) {
+  await req(`/orders/${id}/cancel`, 'PUT');
+  await loadData();
+}
+
+export async function saveReview(rideId, rating, comment) {
+  await req('/reviews', 'POST', { rideId, rating, comment });
+  await loadData();
+}
+
+export async function deleteMyReview(id) {
+  await req(`/my-reviews/${id}`, 'DELETE');
+  await loadData();
+}
+
+export async function addParking(bookingId, vehicleType, vehicleNo) {
+  const p = await req('/parking', 'POST', { bookingId, vehicleType, vehicleNo });
+  await loadData();
+  return p;
+}
+
+export async function cancelParking(id) {
+  await req(`/parking/${id}/cancel`, 'PUT');
+  await loadData();
+}
+
+export const createPassOrder = (planId) => req('/passes/order', 'POST', { planId });
+
+export async function buyPass(planId, payment) {
+  const p = await req('/passes', 'POST', { planId, payment });
+  await loadData();
+  return p;
+}
+
+export async function reportLost(form) {
+  const r = await req('/lost', 'POST', form);
+  await loadData();
+  return r;
+}
+
+export async function saveSettings(values) {
+  await req('/settings', 'PUT', { values });
+  await loadData();
+}
+
+export const labList = () => req('/lab');
+export const labRun = (key, params) => req(`/lab/${key}`, 'POST', { params });
+
 export const revenue = (list) => list.filter((b) => b.status === 'Confirmed').reduce((s, b) => s + b.total, 0);

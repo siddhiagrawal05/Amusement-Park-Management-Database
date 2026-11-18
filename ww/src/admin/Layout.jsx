@@ -1,5 +1,5 @@
 import { NavLink, Outlet, Link, useNavigate } from 'react-router-dom';
-import { FaChartPie, FaRocket, FaCalendarCheck, FaUsers, FaClipboardList, FaFileInvoiceDollar, FaHeadset, FaHome, FaSignOutAlt } from 'react-icons/fa';
+import { FaChartPie, FaRocket, FaCalendarCheck, FaUsers, FaClipboardList, FaFileInvoiceDollar, FaHeadset, FaHome, FaSignOutAlt, FaUtensils, FaTheaterMasks } from 'react-icons/fa';
 import { useAuth } from '../auth';
 
 const menu = [
@@ -10,6 +10,8 @@ const menu = [
   ['/admin/usage', 'Ride Usage', FaClipboardList],
   ['/admin/reports', 'Reports', FaFileInvoiceDollar],
   ['/admin/help', 'Help Requests', FaHeadset],
+  ['/admin/plaza', 'Central Plaza', FaUtensils],
+  ['/admin/shows', 'Live Shows', FaTheaterMasks],
 ];
 
 export default function Layout() {
