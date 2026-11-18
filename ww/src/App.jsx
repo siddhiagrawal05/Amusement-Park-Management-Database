@@ -14,6 +14,8 @@ import Register from './pages/Register';
 import MyBookings from './pages/MyBookings';
 import Ticket from './pages/Ticket';
 import Help from './pages/Help';
+import Passes from './pages/Passes';
+import LostFound from './pages/LostFound';
 import Layout from './admin/Layout';
 import Dash from './admin/Dash';
 import ARides from './admin/ARides';
@@ -30,7 +32,8 @@ import Offers from './admin/Offers';
 import Capacity from './admin/Capacity';
 import Shifts from './admin/Shifts';
 import Reviews from './admin/Reviews';
-import LostFound from './admin/LostFound';
+import ALostFound from './admin/LostFound';
+import './pages/visitor.css';
 
 function Site() {
   return (
@@ -54,6 +57,8 @@ export default function App() {
         <Route path="/shows" element={<Shows />} />
         <Route path="/tickets" element={<Tickets />} />
         <Route path="/help" element={<Help />} />
+        <Route path="/passes" element={<Passes />} />
+        <Route path="/lost-found" element={<LostFound />} />
         <Route path="/login" element={<Login key="v" role="visitor" />} />
         <Route path="/register" element={<Register />} />
         <Route path="/admin/login" element={<Login key="a" role="admin" />} />
@@ -76,7 +81,7 @@ export default function App() {
         <Route path="capacity" element={<Capacity />} />
         <Route path="shifts" element={<Shifts />} />
         <Route path="reviews" element={<Reviews />} />
-        <Route path="lost" element={<LostFound />} />
+        <Route path="lost" element={<ALostFound />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" />} />

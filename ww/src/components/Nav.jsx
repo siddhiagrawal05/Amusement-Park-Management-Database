@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
-import { FaBars, FaTimes, FaHome, FaRocket, FaTicketAlt, FaListAlt, FaChartPie, FaSignInAlt, FaUserShield, FaSignOutAlt, FaStar, FaQuestionCircle, FaMapMarkedAlt, FaUtensils, FaTheaterMasks } from 'react-icons/fa';
+import { FaBars, FaTimes, FaHome, FaRocket, FaTicketAlt, FaUserCircle, FaChartPie, FaSignInAlt, FaUserShield, FaSignOutAlt, FaStar, FaQuestionCircle, FaMapMarkedAlt, FaUtensils, FaTheaterMasks, FaIdCard, FaSearch } from 'react-icons/fa';
 import { useAuth } from '../auth';
 
 export default function Nav() {
@@ -15,8 +15,10 @@ export default function Nav() {
     ['/plaza', 'Plaza', FaUtensils],
     ['/shows', 'Shows', FaTheaterMasks],
     ['/tickets', 'Tickets', FaTicketAlt],
+    ['/passes', 'Passes', FaIdCard],
+    ['/lost-found', 'Lost & Found', FaSearch],
     ['/help', 'Help', FaQuestionCircle],
-    ...(user?.role === 'visitor' ? [['/my-bookings', 'My Bookings', FaListAlt]] : []),
+    ...(user?.role === 'visitor' ? [['/my-bookings', 'My Account', FaUserCircle]] : []),
     ...(user?.role === 'admin' ? [['/admin', 'Dashboard', FaChartPie]] : []),
     ...(!user ? [['/login', 'Login', FaSignInAlt], ['/admin/login', 'Admin', FaUserShield]] : []),
   ];

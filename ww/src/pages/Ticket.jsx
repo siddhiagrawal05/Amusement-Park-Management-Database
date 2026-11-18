@@ -1,4 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
+import { FaCar, FaMotorcycle } from 'react-icons/fa';
 import { all, inr, qrUrl } from '../api';
 import { useAuth } from '../auth';
 import Badge from '../components/Badge';
@@ -12,12 +13,13 @@ export default function Ticket() {
     return (
       <section className="sec center-col">
         <h2>Ticket not found</h2>
-        <Link to="/my-bookings" className="btn">My Bookings</Link>
+        <Link to="/my-bookings" className="btn">My Account</Link>
       </section>
     );
   }
 
   const guests = b.items.reduce((s, i) => s + i.qty, 0);
+  const parking = all('parking').filter((p) => p.bookingId === b.id && p.status === 'Booked');
 
   return (
     <section className="sec center-col">
@@ -42,7 +44,16 @@ export default function Ticket() {
           {b.items.map((i) => (
             <div className="row between" key={i.typeId}><span>{i.name} × {i.qty}</span><span>{inr(i.price * i.qty)}</span></div>
           ))}
+          {b.passDiscount > 0 && <div className="row between save"><span>Annual Pass discount</span><span>− {inr(b.passDiscount)}</span></div>}
+          {b.promoDiscount > 0 && <div className="row between save"><span>Promo {b.promoCode}</span><span>− {inr(b.promoDiscount)}</span></div>}
           <div className="row between total"><span>Total Paid</span><span>{inr(b.total)}</span></div>
+          {parking.length > 0 && (
+            <div className="row gap-top">
+              {parking.map((p) => (
+                <span key={p.id} className="badge b-info">{p.vehicleType === 'Car' ? <FaCar /> : <FaMotorcycle />} Parking {p.vehicleNo}</span>
+              ))}
+            </div>
+          )}
         </div>
         <div className="t-right">
           <img
@@ -57,7 +68,7 @@ export default function Ticket() {
 
       <div className="row center no-print">
         <button className="btn" onClick={() => window.print()}>Print Ticket</button>
-        <Link to="/my-bookings" className="btn o dark">My Bookings</Link>
+        <Link to="/my-bookings" className="btn o dark">My Account</Link>
       </div>
     </section>
   );
