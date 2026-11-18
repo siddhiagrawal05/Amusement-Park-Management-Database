@@ -9,6 +9,12 @@ export function AuthProvider({ children }) {
   const value = {
     user,
     login: async (email, password, role) => setUser(await api.login(email, password, role)),
+    loginWithCode: async (email, code, name, phone) => setUser(await api.loginWithCode(email, code, name, phone)),
+    loginWithGoogle: async (credential, phone) => {
+      const r = await api.loginWithGoogle(credential, phone);
+      if (r.user) setUser(r.user);
+      return r;
+    },
     register: async (form) => setUser(await api.register(form)),
     logout: () => {
       setUser(null);

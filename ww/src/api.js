@@ -79,6 +79,25 @@ export async function login(email, password, role) {
   return s.user;
 }
 
+export const sendLoginCode = (email) => req('/auth/code/send', 'POST', { email });
+
+export async function loginWithCode(email, code, name, phone) {
+  const s = await req('/auth/code/verify', 'POST', { email, code, name, phone });
+  setSession(s);
+  await loadData();
+  return s.user;
+}
+
+export const getGoogleConfig = () => req('/auth/google/config');
+
+export async function loginWithGoogle(credential, phone) {
+  const r = await req('/auth/google', 'POST', { credential, phone });
+  if (r.needPhone) return r;
+  setSession(r);
+  await loadData();
+  return r;
+}
+
 export async function logout() {
   setSession(null);
   await loadData();

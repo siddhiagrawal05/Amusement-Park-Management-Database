@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
-import { FaBars, FaTimes, FaHome, FaRocket, FaTicketAlt, FaUserCircle, FaChartPie, FaSignInAlt, FaUserShield, FaSignOutAlt, FaStar, FaQuestionCircle, FaMapMarkedAlt, FaUtensils, FaTheaterMasks, FaIdCard, FaSearch } from 'react-icons/fa';
+import { FaBars, FaTimes, FaHome, FaRocket, FaTicketAlt, FaChartPie, FaSignInAlt, FaUserShield, FaSignOutAlt, FaStar, FaQuestionCircle, FaMapMarkedAlt, FaUtensils, FaTheaterMasks, FaIdCard, FaSearch } from 'react-icons/fa';
 import { useAuth } from '../auth';
 
 export default function Nav() {
   const [open, setOpen] = useState(false);
   const { user, logout } = useAuth();
   const nav = useNavigate();
+  const initials = (n = '') => n.trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?';
 
   const items = [
     ['/', 'Home', FaHome],
@@ -18,7 +19,6 @@ export default function Nav() {
     ['/passes', 'Passes', FaIdCard],
     ['/lost-found', 'Lost & Found', FaSearch],
     ['/help', 'Help', FaQuestionCircle],
-    ...(user?.role === 'visitor' ? [['/my-bookings', 'My Account', FaUserCircle]] : []),
     ...(user?.role === 'admin' ? [['/admin', 'Dashboard', FaChartPie]] : []),
     ...(!user ? [['/login', 'Login', FaSignInAlt], ['/admin/login', 'Admin', FaUserShield]] : []),
   ];
@@ -38,10 +38,16 @@ export default function Nav() {
             <span>{label}</span>
           </NavLink>
         ))}
+        {user?.role === 'visitor' && (
+          <NavLink to="/my-bookings" className="nav-me" title={`Logged in as ${user.email}`}>
+            <span className="avatar">{initials(user.name)}</span>
+            <span>Hi, {user.name.split(' ')[0]}</span>
+          </NavLink>
+        )}
         {user && (
           <button className="nav-out" onClick={() => { logout(); nav('/'); }}>
             <FaSignOutAlt />
-            <span>Logout ({user.name.split(' ')[0]})</span>
+            <span>Logout</span>
           </button>
         )}
       </div>

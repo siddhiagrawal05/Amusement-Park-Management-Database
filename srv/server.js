@@ -8,6 +8,8 @@ const Razorpay = require('razorpay');
 const db = require('./db');
 const { sendBookingEmail } = require('./mailer');
 const features = require('./features');
+const otp = require('./otp');
+const google = require('./google');
 
 const app = express();
 app.use(cors());
@@ -114,6 +116,8 @@ async function priceItems(visitDate, items) {
   return { lines, total: lines.reduce((s, l) => s + l.price * l.qty, 0) };
 }
 const extra = features({ app, db, auth, wrap, fail, who, today });
+otp({ app, db, wrap, fail, sign, today });
+google({ app, db, wrap, fail, sign, today });
 async function quote(userId, visitDate, items, promoCode) {
   const { lines, total: subtotal } = await priceItems(visitDate, items);
   const guests = lines.reduce((s, l) => s + l.qty, 0);
