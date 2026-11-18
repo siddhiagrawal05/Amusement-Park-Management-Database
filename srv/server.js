@@ -1,10 +1,13 @@
 // WonderWorld API server (Node + Express + MySQL)
-require('dotenv').config();
+require('dotenv').config({ override: true });
+const crypto = require('crypto');
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const Razorpay = require('razorpay');
 const db = require('./db');
+const { sendBookingEmail } = require('./mailer');
 
 const app = express();
 app.use(cors());
@@ -15,6 +18,14 @@ const today = () => {
   const d = new Date();
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 };
+
+// Payment: real Razorpay if keys are set, otherwise DEMO mode
+const KEY_ID = process.env.RAZORPAY_KEY_ID || '';
+const KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || '';
+const rzp = KEY_ID && KEY_SECRET && !KEY_ID.includes('xxxx')
+  ? new Razorpay({ key_id: KEY_ID, key_secret: KEY_SECRET })
+  : null;
+const demoOrders = new Map(); // orderId -> { userId, amount, created }
 
 // ---------- Helpers ----------
 // Read the logged-in user from the token. Returns null (no token), 'bad' (expired/invalid) or the user.
@@ -37,11 +48,14 @@ const auth = (role) => (req, res, next) => {
   next();
 };
 
+// Create an error with an HTTP status
+const fail = (status, message) => Object.assign(new Error(message), { status });
+
 // Catch errors in async routes and send them back as JSON
 const wrap = (fn) => (req, res) =>
   fn(req, res).catch((e) => {
-    console.error(e);
-    res.status(500).json({ error: e.sqlMessage || e.message });
+    if (!e.status) console.error(e);
+    res.status(e.status || 500).json({ error: e.sqlMessage || e.error?.description || e.message || 'Server error' });
   });
 
 const safeUser = (u) => ({ id: u.id, name: u.name, email: u.email, phone: u.phone, role: u.role, joined: u.joined });
@@ -59,12 +73,14 @@ const SEL = {
   employees: 'SELECT id, name, role, phone, email, ride_id AS rideId FROM employees ORDER BY id',
   users: 'SELECT id, name, email, phone, role, joined FROM users ORDER BY id',
   rideLogs: 'SELECT id, user_id AS userId, ride_id AS rideId, ride_date AS `date` FROM ride_logs ORDER BY id',
+  supportRequests: "SELECT id, user_id AS userId, name, phone, email, topic, message, preferred_time AS preferredTime, status, DATE_FORMAT(created_at, '%Y-%m-%d %H:%i') AS createdAt FROM support_requests ORDER BY id DESC",
 };
 
 // Bookings with their ticket items (all bookings, or only one user's)
 async function getBookings(userId) {
   const [list] = await db.query(
-    `SELECT id, booking_code AS bookingId, user_id AS userId, visit_date AS visitDate, total, status, created_at AS createdAt
+    `SELECT id, booking_code AS bookingId, user_id AS userId, visit_date AS visitDate, total, status,
+            created_at AS createdAt, payment_id AS paymentId
      FROM bookings ${userId ? 'WHERE user_id = ?' : ''} ORDER BY id`,
     userId ? [userId] : []
   );
@@ -77,6 +93,21 @@ async function getBookings(userId) {
     b.items = items.filter((i) => i.bid === b.id).map(({ bid, ...i }) => i);
   });
   return list;
+}
+
+// Check visit date + tickets and calculate the total on the server (never trust the browser's total)
+async function priceItems(visitDate, items) {
+  if (!visitDate || visitDate < today()) throw fail(400, 'Please choose a valid visit date.');
+  const [types] = await db.query(SEL.ticketTypes);
+  const lines = (items || [])
+    .filter((i) => i.qty > 0 && i.qty <= 10)
+    .map((i) => {
+      const t = types.find((x) => x.id === i.typeId);
+      return t && { typeId: t.id, name: t.name, price: t.price, qty: i.qty };
+    })
+    .filter(Boolean);
+  if (!lines.length) throw fail(400, 'Please add at least one ticket.');
+  return { lines, total: lines.reduce((s, l) => s + l.price * l.qty, 0) };
 }
 
 // ---------- Health check ----------
@@ -131,6 +162,7 @@ app.get('/api/data', wrap(async (req, res) => {
     out.employees = await run('employees');
     out.users = await run('users');
     out.bookings = await getBookings();
+    out.supportRequests = await run('supportRequests');
   } else {
     out.rideLogs = logs.map(({ userId, ...l }) => l); // hide who rode
     if (u && u.role === 'visitor') out.bookings = await getBookings(u.id); // only own bookings
@@ -138,25 +170,77 @@ app.get('/api/data', wrap(async (req, res) => {
   res.json(out);
 }));
 
+// ---------- Help Center: call back requests (anyone can send) ----------
+app.post('/api/support', wrap(async (req, res) => {
+  const u = who(req);
+  const { name, phone, email = '', topic = 'Other', message = '', preferredTime = 'Anytime' } = req.body;
+  if (!name || !String(name).trim() || !/^\d{10}$/.test(phone || '')) {
+    throw fail(400, 'Please enter your name and a 10-digit phone number.');
+  }
+  const [r] = await db.query(
+    'INSERT INTO support_requests (user_id, name, phone, email, topic, message, preferred_time, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [u && u !== 'bad' ? u.id : null, String(name).trim(), phone, String(email).trim(), topic, String(message).trim().slice(0, 500), preferredTime, 'Open']
+  );
+  res.json({ id: r.insertId });
+}));
+
+// ---------- Module 2: Payment ----------
+// Step 1: create a payment order for the amount calculated on the server
+app.post('/api/payments/order', auth('visitor'), wrap(async (req, res) => {
+  const { visitDate, items } = req.body;
+  const { total } = await priceItems(visitDate, items);
+  const amount = total * 100; // in paise
+
+  if (!rzp) {
+    const orderId = 'order_demo_' + crypto.randomBytes(6).toString('hex');
+    demoOrders.set(orderId, { userId: req.user.id, amount, created: Date.now() });
+    return res.json({ mode: 'demo', orderId, amount, currency: 'INR' });
+  }
+
+  const order = await rzp.orders.create({
+    amount,
+    currency: 'INR',
+    receipt: `ww_${req.user.id}_${Date.now()}`,
+    notes: { userId: String(req.user.id), visitDate },
+  });
+  res.json({ mode: 'razorpay', orderId: order.id, amount: order.amount, currency: order.currency, keyId: KEY_ID });
+}));
+
 // ---------- Module 2: Bookings (visitor only) ----------
 const genCode = () => 'WW' + Math.random().toString(36).slice(2, 8).toUpperCase().padEnd(6, 'X');
 
+// Step 2: verify the payment, then save the booking and send the email
 app.post('/api/bookings', auth('visitor'), wrap(async (req, res) => {
-  const { visitDate, items } = req.body;
-  if (!visitDate || visitDate < today()) return res.status(400).json({ error: 'Please choose a valid visit date.' });
+  const { visitDate, items, payment = {} } = req.body;
+  const { lines, total } = await priceItems(visitDate, items);
+  let paymentId;
 
-  const [types] = await db.query(SEL.ticketTypes);
-  const lines = (items || [])
-    .filter((i) => i.qty > 0 && i.qty <= 10)
-    .map((i) => {
-      const t = types.find((x) => x.id === i.typeId);
-      return t && { typeId: t.id, name: t.name, price: t.price, qty: i.qty };
-    })
-    .filter(Boolean);
-  if (!lines.length) return res.status(400).json({ error: 'Please add at least one ticket.' });
-  const total = lines.reduce((s, l) => s + l.price * l.qty, 0);
+  if (!rzp) {
+    // Demo payment: the order must exist, belong to this visitor, match the amount and be under 30 minutes old
+    const o = demoOrders.get(payment.orderId);
+    if (!o || o.userId !== req.user.id || o.amount !== total * 100 || Date.now() - o.created > 30 * 60 * 1000) {
+      throw fail(400, 'Payment could not be verified. Please try again.');
+    }
+    demoOrders.delete(payment.orderId); // one order = one booking
+    paymentId = 'pay_demo_' + crypto.randomBytes(7).toString('hex');
+  } else {
+    // Razorpay: check the payment signature
+    const { orderId, signature } = payment;
+    if (!orderId || !payment.paymentId || !signature) throw fail(400, 'Please complete the payment first.');
+    const expected = crypto.createHmac('sha256', KEY_SECRET).update(`${orderId}|${payment.paymentId}`).digest('hex');
+    if (expected !== signature) throw fail(400, 'Payment could not be verified.');
+    const order = await rzp.orders.fetch(orderId);
+    if (String(order.notes?.userId) !== String(req.user.id) || Number(order.amount) !== total * 100) {
+      throw fail(400, 'Payment does not match this booking.');
+    }
+    const [[used]] = await db.query('SELECT id FROM bookings WHERE payment_id = ?', [payment.paymentId]);
+    if (used) throw fail(400, 'This payment has already been used.');
+    paymentId = payment.paymentId;
+  }
 
+  // Save the booking
   const conn = await db.getConnection();
+  let booking;
   try {
     await conn.beginTransaction();
     let code;
@@ -166,8 +250,8 @@ app.post('/api/bookings', auth('visitor'), wrap(async (req, res) => {
       if (!x) break;
     }
     const [r] = await conn.query(
-      'INSERT INTO bookings (booking_code, user_id, visit_date, total, status, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [code, req.user.id, visitDate, total, 'Confirmed', today()]
+      'INSERT INTO bookings (booking_code, user_id, visit_date, total, status, created_at, payment_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [code, req.user.id, visitDate, total, 'Confirmed', today(), paymentId]
     );
     for (const l of lines) {
       await conn.query(
@@ -176,13 +260,19 @@ app.post('/api/bookings', auth('visitor'), wrap(async (req, res) => {
       );
     }
     await conn.commit();
-    res.json({ id: r.insertId, bookingId: code, visitDate, total, items: lines, status: 'Confirmed' });
+    booking = { id: r.insertId, bookingId: code, visitDate, total, items: lines, status: 'Confirmed', paymentId };
   } catch (e) {
     await conn.rollback();
     throw e;
   } finally {
     conn.release();
   }
+
+  // Send the confirmation email (does not block the booking if email fails)
+  const [[u]] = await db.query('SELECT name, email FROM users WHERE id = ?', [req.user.id]);
+  sendBookingEmail(u.email, u.name, booking).catch((e) => console.error('Email failed:', e.message));
+
+  res.json(booking);
 }));
 
 app.put('/api/bookings/:id/cancel', auth('visitor'), wrap(async (req, res) => {
@@ -202,7 +292,7 @@ app.post('/api/rides/:id/ride', auth('visitor'), wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
-// ---------- Modules 3, 4, 5: Admin add / update / delete ----------
+// ---------- Modules 3, 4, 5 + Help: Admin add / update / delete ----------
 // React field name -> MySQL column name
 const WRITE = {
   rides: { table: 'rides', cols: { name: 'name', category: 'category', img: 'img', status: 'status', capacity: 'capacity', minHeight: 'min_height', minAge: 'min_age', duration: 'duration', rules: 'rules', desc: 'description' } },
@@ -210,6 +300,7 @@ const WRITE = {
   maintenance: { table: 'maintenance', cols: { rideId: 'ride_id', date: 'maint_date', desc: 'description', status: 'status' } },
   employees: { table: 'employees', cols: { name: 'name', role: 'role', phone: 'phone', email: 'email', rideId: 'ride_id' } },
   rideLogs: { table: 'ride_logs', cols: { userId: 'user_id', rideId: 'ride_id', date: 'ride_date' } },
+  supportRequests: { table: 'support_requests', cols: { status: 'status' } },
 };
 
 function pick(t, body) {
@@ -259,3 +350,4 @@ app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`)
 db.query('SELECT 1')
   .then(() => console.log('MySQL connected'))
   .catch((e) => console.error('MySQL connection failed:', e.message));
+console.log(rzp ? 'Payment: Razorpay (test mode)' : 'Payment: DEMO mode (no Razorpay keys needed)');

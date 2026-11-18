@@ -19,27 +19,48 @@ export default function Sched() {
   const [m, setM] = useState({ rideId: '', date: today(), desc: '', status: 'Scheduled' });
   const [err, setErr] = useState('');
 
-  const addS = (e) => {
+  const addS = async (e) => {
     e.preventDefault();
     if (s.close <= s.open) return setErr('Closing time must be after opening time.');
-    upsert('schedules', { ...s, rideId: +s.rideId });
-    setErr('');
-    setS({ ...s, rideId: '' });
-    re();
+    try {
+      await upsert('schedules', { ...s, rideId: +s.rideId });
+      setErr('');
+      setS({ ...s, rideId: '' });
+      re();
+    } catch (x) {
+      setErr(x.message);
+    }
   };
 
-  const delS = (id) => {
-    if (window.confirm('Delete this schedule?')) { remove('schedules', id); re(); }
+  const delS = async (id) => {
+    if (!window.confirm('Delete this schedule?')) return;
+    try {
+      await remove('schedules', id);
+      re();
+    } catch (x) {
+      alert(x.message);
+    }
   };
 
-  const addM = (e) => {
+  const addM = async (e) => {
     e.preventDefault();
-    saveMaint({ ...m, rideId: +m.rideId });
-    setM({ ...m, rideId: '', desc: '' });
-    re();
+    try {
+      await saveMaint({ ...m, rideId: +m.rideId });
+      setM({ ...m, rideId: '', desc: '' });
+      re();
+    } catch (x) {
+      alert(x.message);
+    }
   };
 
-  const setMS = (x, status) => { saveMaint({ ...x, status }); re(); };
+  const setMS = async (x, status) => {
+    try {
+      await saveMaint({ ...x, status });
+      re();
+    } catch (e) {
+      alert(e.message);
+    }
+  };
 
   return (
     <>

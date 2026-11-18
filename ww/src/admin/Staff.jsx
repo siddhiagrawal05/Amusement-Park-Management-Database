@@ -15,20 +15,31 @@ export default function Staff() {
   const list = all('employees').filter((e) => (e.name + e.role).toLowerCase().includes(q.toLowerCase()));
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
-  const save = (e) => {
+  const save = async (e) => {
     e.preventDefault();
     if (!/^\d{10}$/.test(form.phone)) return setErr('Phone number must be 10 digits.');
-    upsert('employees', { ...form, rideId: form.rideId ? +form.rideId : null });
-    setForm(blank);
-    setErr('');
-    re();
+    try {
+      await upsert('employees', { ...form, rideId: form.rideId ? +form.rideId : null });
+      setForm(blank);
+      setErr('');
+      re();
+    } catch (x) {
+      setErr(x.message);
+    }
   };
 
-  const assign = (emp, rideId) => { upsert('employees', { id: emp.id, rideId: rideId ? +rideId : null }); re(); };
+  const assign = async (emp, rideId) => {
+    try {
+      await upsert('employees', { id: emp.id, rideId: rideId ? +rideId : null });
+      re();
+    } catch (x) {
+      alert(x.message);
+    }
+  };
 
   return (
     <>
-      <h3 className="h">👷 Employee Management</h3>
+      <h3 className="h">Employee Management</h3>
 
       <form className="card fgrid mb" onSubmit={save}>
         <h4 className="span">{form.id ? `Update: ${form.name}` : 'Add New Employee'}</h4>

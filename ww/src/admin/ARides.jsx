@@ -11,21 +11,34 @@ export default function ARides() {
   const [, refresh] = useState(0);
   const re = () => refresh((x) => x + 1);
   const [form, setForm] = useState(null);
+  const [err, setErr] = useState('');
   const rides = all('rides');
   const logs = all('rideLogs');
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
-  const save = (e) => {
+  const save = async (e) => {
     e.preventDefault();
-    upsert('rides', {
-      ...form,
-      capacity: +form.capacity, minHeight: +form.minHeight, minAge: +form.minAge, duration: +form.duration,
-    });
-    setForm(null);
-    re();
+    try {
+      await upsert('rides', {
+        ...form,
+        capacity: +form.capacity, minHeight: +form.minHeight, minAge: +form.minAge, duration: +form.duration,
+      });
+      setForm(null);
+      setErr('');
+      re();
+    } catch (x) {
+      setErr(x.message);
+    }
   };
 
-  const changeStatus = (r, s) => { upsert('rides', { id: r.id, status: s }); re(); };
+  const changeStatus = async (r, s) => {
+    try {
+      await upsert('rides', { id: r.id, status: s });
+      re();
+    } catch (x) {
+      alert(x.message);
+    }
+  };
 
   return (
     <>
@@ -45,11 +58,12 @@ export default function ARides() {
           <label>Min Age (years)<input type="number" min="0" value={form.minAge} onChange={set('minAge')} /></label>
           <label>Duration (minutes)<input type="number" min="1" value={form.duration} onChange={set('duration')} /></label>
           <label className="span">Photo URL (paste any image link)
-            <input value={form.img} onChange={set('img')} placeholder="https://images.unsplash.com/..." />
+            <input value={form.img || ''} onChange={set('img')} placeholder="https://images.unsplash.com/..." />
           </label>
           {form.img && <div className="span prev"><Img src={form.img} alt="Preview" /></div>}
-          <label className="span">Restrictions / Rules<input value={form.rules} onChange={set('rules')} /></label>
-          <label className="span">Description<textarea rows="2" value={form.desc} onChange={set('desc')} /></label>
+          <label className="span">Restrictions / Rules<input value={form.rules || ''} onChange={set('rules')} /></label>
+          <label className="span">Description<textarea rows="2" value={form.desc || ''} onChange={set('desc')} /></label>
+          {err && <p className="err span">{err}</p>}
           <div className="span row">
             <button className="btn">Save Ride</button>
             <button type="button" className="btn o dark" onClick={() => setForm(null)}>Cancel</button>

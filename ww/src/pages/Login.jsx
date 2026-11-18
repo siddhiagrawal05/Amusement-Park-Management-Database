@@ -6,24 +6,28 @@ export default function Login({ role }) {
   const admin = role === 'admin';
   const [f, setF] = useState({ email: '', password: '' });
   const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
   const { login } = useAuth();
   const nav = useNavigate();
   const loc = useLocation();
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
+    setErr('');
+    setBusy(true);
     try {
-      login(f.email.trim(), f.password, role);
+      await login(f.email.trim(), f.password, role);
       nav(loc.state?.from || (admin ? '/admin' : '/'), { replace: true });
     } catch (x) {
       setErr(x.message);
+      setBusy(false);
     }
   };
 
   return (
     <div className="auth">
       <form className="auth-box" onSubmit={submit}>
-        <h2>{admin ? '🛡️ Admin Login' : '🎟️ Visitor Login'}</h2>
+        <h2>{admin ? 'Admin Login' : 'Visitor Login'}</h2>
         <p className="mut">{admin ? 'Park staff and managers only.' : 'Log in to book tickets and see your bookings.'}</p>
         <div className="hint">Demo: {admin ? 'admin@ww.com / admin123' : 'demo@ww.com / demo123'}</div>
         <label>Email
@@ -33,7 +37,7 @@ export default function Login({ role }) {
           <input type="password" required value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} />
         </label>
         {err && <p className="err">{err}</p>}
-        <button className="btn full">Login</button>
+        <button className="btn full" disabled={busy}>{busy ? 'Please wait...' : 'Login'}</button>
         {admin ? (
           <p className="small center-t">Visitor? <Link to="/login">Login here</Link></p>
         ) : (

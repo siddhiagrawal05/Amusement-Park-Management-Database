@@ -1,5 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
-import { all, inr } from '../api';
+import { all, inr, qrUrl } from '../api';
 import { useAuth } from '../auth';
 import Badge from '../components/Badge';
 
@@ -21,7 +21,11 @@ export default function Ticket() {
 
   return (
     <section className="sec center-col">
-      {b.status === 'Confirmed' && <div className="ok-msg no-print">🎉 Booking confirmed! Show this ticket at the park entry gate.</div>}
+      {b.status === 'Confirmed' && (
+        <div className="ok-msg no-print">
+          Booking confirmed! A confirmation email has been sent to {user.email}. Show this QR code at the park entry gate.
+        </div>
+      )}
 
       <div className="ticket">
         <div className="t-left">
@@ -32,6 +36,8 @@ export default function Ticket() {
             <div><small>Visit Date</small><b>{b.visitDate}</b></div>
             <div><small>Name</small><b>{user.name}</b></div>
             <div><small>Status</small><Badge s={b.status} /></div>
+            <div><small>Payment</small><b>{b.paymentId ? 'Paid online' : 'Paid at counter'}</b></div>
+            <div><small>Payment ID</small><b>{b.paymentId || '—'}</b></div>
           </div>
           {b.items.map((i) => (
             <div className="row between" key={i.typeId}><span>{i.name} × {i.qty}</span><span>{inr(i.price * i.qty)}</span></div>
@@ -39,7 +45,11 @@ export default function Ticket() {
           <div className="row between total"><span>Total Paid</span><span>{inr(b.total)}</span></div>
         </div>
         <div className="t-right">
-          <div className="barcode" />
+          <img
+            src={qrUrl(b)}
+            alt={`QR code for booking ${b.bookingId}`}
+            style={{ width: 150, height: 150, background: '#fff', padding: 6, borderRadius: 12 }}
+          />
           <b>{b.bookingId}</b>
           <small>{guests} Guest{guests > 1 ? 's' : ''}</small>
         </div>

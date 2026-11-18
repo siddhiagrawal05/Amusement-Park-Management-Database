@@ -1,0 +1,11 @@
+{
+  "name": "wonderworld",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "concurrently -k -n API,WEB -c blue,magenta \"cd srv && node --watch server.js\" \"cd ww && npm run dev -- --open\""
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6"
+  }
+}

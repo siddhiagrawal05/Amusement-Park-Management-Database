@@ -19,9 +19,13 @@ export default function Rides() {
     (r) => (cat === 'All' || r.category === cat) && r.name.toLowerCase().includes(q.toLowerCase())
   );
 
-  const rode = (r) => {
-    logRide(user.id, r.id);
-    setMsg(`Enjoy ${r.name}! Your ride has been recorded.`);
+  const rode = async (r) => {
+    try {
+      await logRide(r.id);
+      setMsg(`Enjoy ${r.name}! Your ride has been recorded.`);
+    } catch (e) {
+      setMsg(e.message);
+    }
     setTimeout(() => setMsg(''), 3000);
   };
 

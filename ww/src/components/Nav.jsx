@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
-import { FaBars, FaTimes, FaHome, FaRocket, FaTicketAlt, FaListAlt, FaChartPie, FaSignInAlt, FaUserShield, FaSignOutAlt, FaStar } from 'react-icons/fa';
+import { FaBars, FaTimes, FaHome, FaRocket, FaTicketAlt, FaListAlt, FaChartPie, FaSignInAlt, FaUserShield, FaSignOutAlt, FaStar, FaQuestionCircle, FaMapMarkedAlt, FaUtensils } from 'react-icons/fa';
 import { useAuth } from '../auth';
 
 export default function Nav() {
@@ -11,7 +11,10 @@ export default function Nav() {
   const items = [
     ['/', 'Home', FaHome],
     ['/rides', 'Rides', FaRocket],
+    ['/map', 'Map', FaMapMarkedAlt],
+    ['/plaza', 'Plaza', FaUtensils],
     ['/tickets', 'Tickets', FaTicketAlt],
+    ['/help', 'Help', FaQuestionCircle],
     ...(user?.role === 'visitor' ? [['/my-bookings', 'My Bookings', FaListAlt]] : []),
     ...(user?.role === 'admin' ? [['/admin', 'Dashboard', FaChartPie]] : []),
     ...(!user ? [['/login', 'Login', FaSignInAlt], ['/admin/login', 'Admin', FaUserShield]] : []),

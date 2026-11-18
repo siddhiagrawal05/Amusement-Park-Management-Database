@@ -7,22 +7,28 @@ export default function Usage() {
   const rides = all('rides');
   const [f, setF] = useState({ userId: '', rideId: '', date: today() });
   const [filter, setFilter] = useState('');
+  const [err, setErr] = useState('');
 
   const allLogs = all('rideLogs').filter((l) => !filter || l.rideId === +filter);
   const logs = [...allLogs].sort((a, b) => b.id - a.id).slice(0, 50);
   const vname = (id) => visitors.find((u) => u.id === id)?.name || '-';
   const rname = (id) => rides.find((r) => r.id === id)?.name || '-';
 
-  const add = (e) => {
+  const add = async (e) => {
     e.preventDefault();
-    upsert('rideLogs', { userId: +f.userId, rideId: +f.rideId, date: f.date });
-    setF({ ...f, rideId: '' });
-    refresh((x) => x + 1);
+    try {
+      await upsert('rideLogs', { userId: +f.userId, rideId: +f.rideId, date: f.date });
+      setF({ ...f, rideId: '' });
+      setErr('');
+      refresh((x) => x + 1);
+    } catch (x) {
+      setErr(x.message);
+    }
   };
 
   return (
     <>
-      <h3 className="h">📋 Ride Usage (Which visitor used which ride)</h3>
+      <h3 className="h">Ride Usage (Which visitor used which ride)</h3>
 
       <form className="card fgrid mb" onSubmit={add}>
         <label>Visitor
@@ -38,6 +44,7 @@ export default function Usage() {
           </select>
         </label>
         <label>Date<input type="date" required value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></label>
+        {err && <p className="err span">{err}</p>}
         <div className="span"><button className="btn sm">+ Record Ride</button></div>
       </form>
 

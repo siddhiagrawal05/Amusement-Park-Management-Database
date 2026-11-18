@@ -4,20 +4,15 @@ import * as api from './api';
 const Ctx = createContext();
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('ww_user') || 'null'));
-
-  const keep = (u) => {
-    localStorage.setItem('ww_user', JSON.stringify(u));
-    setUser(u);
-  };
+  const [user, setUser] = useState(() => api.getSession()?.user || null);
 
   const value = {
     user,
-    login: (email, password, role) => keep(api.login(email, password, role)),
-    register: (form) => keep(api.register(form)),
+    login: async (email, password, role) => setUser(await api.login(email, password, role)),
+    register: async (form) => setUser(await api.register(form)),
     logout: () => {
-      localStorage.removeItem('ww_user');
       setUser(null);
+      api.logout();
     },
   };
 

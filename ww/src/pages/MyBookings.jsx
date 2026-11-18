@@ -1,18 +1,16 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { all, cancelBooking, canCancel, inr } from '../api';
-import { useAuth } from '../auth';
 import Badge from '../components/Badge';
 
 export default function MyBookings() {
-  const { user } = useAuth();
   const [, refresh] = useState(0);
-  const list = all('bookings').filter((b) => b.userId === user.id).sort((a, b) => b.id - a.id);
+  const list = [...all('bookings')].sort((a, b) => b.id - a.id); // server sends only this visitor's bookings
 
-  const cancel = (b) => {
+  const cancel = async (b) => {
     if (!window.confirm(`Cancel booking ${b.bookingId}?`)) return;
     try {
-      cancelBooking(b.id);
+      await cancelBooking(b.id);
       refresh((x) => x + 1);
     } catch (e) {
       alert(e.message);
